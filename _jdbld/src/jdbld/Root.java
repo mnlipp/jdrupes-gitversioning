@@ -18,21 +18,15 @@
 
 package jdbld;
 
-import java.util.stream.Stream;
 import static org.jdrupes.builder.api.Intend.*;
 import org.jdrupes.builder.api.Project;
-import static org.jdrupes.builder.api.Project.Properties.*;
 import static org.jdrupes.builder.api.ResourceRequest.requestFor;
 import org.jdrupes.builder.api.RootProject;
 import org.jdrupes.builder.core.AbstractProject;
 import org.jdrupes.builder.eclipse.EclipseConfiguration;
-import static org.jdrupes.builder.java.JavaTypes.*;
-import org.jdrupes.builder.mvnrepo.JavadocJarGenerator;
 import org.jdrupes.builder.mvnrepo.MvnPublication;
-import org.jdrupes.builder.mvnrepo.MvnRepoLookup;
 import org.jdrupes.builder.mvnrepo.PomFile;
 import static org.jdrupes.builder.mvnrepo.MvnProperties.*;
-import org.jdrupes.builder.java.Javadoc;
 import org.jdrupes.builder.java.JavadocDirectory;
 import org.jdrupes.builder.java.LibraryJarFile;
 
@@ -52,40 +46,6 @@ public class Root extends AbstractProject implements RootProject {
 
         dependency(Expose, project(Api.class));
         dependency(Expose, project(Core.class));
-
-        // Supply javadoc
-        generator(Javadoc::new)
-            .projects(Stream.of(project(Api.class), project(Core.class)))
-            .destination(rootProject().directory().resolve("webpages/javadoc"))
-            .tagletpath(from(new MvnRepoLookup()
-                .resolve("org.jdrupes.taglets:plantuml-taglet:3.1.0",
-                    "net.sourceforge.plantuml:plantuml:1.2023.11"))
-                        .get(requestFor(RuntimeClasspathType)))
-            .taglets(Stream.of("org.jdrupes.taglets.plantUml.PlantUml",
-                "org.jdrupes.taglets.plantUml.StartUml",
-                "org.jdrupes.taglets.plantUml.EndUml"))
-            .options("-overview",
-                directory().resolve("overview.html").toString())
-            .options("--add-stylesheet",
-                directory().resolve("misc/javadoc-overwrites.css").toString())
-            .options("--add-script",
-                directory().resolve("misc/highlight.min.js").toString())
-            .options("--add-script",
-                directory().resolve("misc/highlight-all.js").toString())
-            .options("--add-stylesheet",
-                directory().resolve("misc/highlight-default.css").toString())
-            .options("-bottom",
-                readString(directory().resolve("misc/javadoc.bottom.txt")))
-            .options("--allow-script-in-comments")
-            .options("-linksource")
-            .options("-link",
-                "https://docs.oracle.com/en/java/javase/21/docs/api/")
-            .options("-link",
-                "https://maven.apache.org/ref/3-LATEST/apidocs/")
-            .options("-quiet");
-
-        // Supply javadoc jar
-        generator(JavadocJarGenerator::new);
 
         // Commands
         commandAlias("build", requestFor(LibraryJarFile.class),

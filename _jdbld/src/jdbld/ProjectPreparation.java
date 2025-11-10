@@ -44,7 +44,9 @@ import org.jdrupes.builder.java.JavaCompiler;
 import org.jdrupes.builder.java.JavaProject;
 import org.jdrupes.builder.java.JavaResourceCollector;
 import org.jdrupes.builder.java.JavaSourceFile;
+import org.jdrupes.builder.java.Javadoc;
 import org.jdrupes.builder.java.LibraryGenerator;
+import org.jdrupes.builder.mvnrepo.JavadocJarGenerator;
 import org.jdrupes.builder.mvnrepo.MvnPublisher;
 import org.jdrupes.builder.mvnrepo.PomFile;
 import org.jdrupes.builder.mvnrepo.PomFileGenerator;
@@ -70,7 +72,7 @@ public class ProjectPreparation {
         var evaluator = VersionEvaluator
             .forRepository(project.<Git> get(GitApi).getRepository())
             .subDirectory(project.directory())
-            .tagFilter(new DefaultTagFilter().prepend("v"));
+            .tagFilter(new DefaultTagFilter().prepend(project.name() + "-"));
         project.set(Version, evaluator.version());
     }
 
@@ -122,6 +124,29 @@ public class ProjectPreparation {
                 .addTrees(project.get(
                     new ResourceRequest<FileTree<JavaSourceFile>>(
                         new ResourceType<>() {})));
+
+            // Supply javadoc
+            project.generator(Javadoc::new)
+                .options("-overview", project.rootProject().directory()
+                    .resolve("overview.html").toString())
+                .options("--add-stylesheet", project.rootProject().directory()
+                    .resolve("misc/javadoc-overwrites.css").toString())
+                .options("--add-script", project.rootProject().directory()
+                    .resolve("misc/highlight.min.js").toString())
+                .options("--add-script", project.rootProject().directory()
+                    .resolve("misc/highlight-all.js").toString())
+                .options("--add-stylesheet", project.rootProject().directory()
+                    .resolve("misc/highlight-default.css").toString())
+                .options("-bottom", project.rootProject().readString(
+                    Path.of("misc/javadoc.bottom.txt")))
+                .options("--allow-script-in-comments")
+                .options("-linksource")
+                .options("-link",
+                    "https://docs.oracle.com/en/java/javase/21/docs/api/")
+                .options("-quiet");
+
+            // Supply javadoc jar
+            project.generator(JavadocJarGenerator::new);
 
             // Publish (deploy). Credentials and signing information is
             // obtained through properties.
