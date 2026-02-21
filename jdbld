@@ -1,5 +1,6 @@
 #!/usr/bin/bash
 
+releaseVersion="0.0.20"
 propertiesFile=".jdbld.properties"
 
 if [ ! -r "$propertiesFile" ]; then
@@ -26,7 +27,7 @@ getProperty() {
 
 # Get the executable jar
 
-jdbldVersion=$(getProperty "jdbldVersion" "0.0.3")
+jdbldVersion=$(getProperty "jdbldVersion" $releaseVersion)
 
 if [ -n "$JDBLD_JAR" ]; then
   builderJar="$JDBLD_JAR"
@@ -42,7 +43,7 @@ elif ! expr >/dev/null "$jdbldVersion" : '.*-SNAPSHOT$'; then
       -o "$builderJar"
   fi
 else
-  # Snaphost are more difficult becaus ethey have no "guessable" file name.
+  # Snaphost are more difficult because they have no "guessable" file name.
   xmlstarlet=$(command -v "xmlstarlet")
   if [ $? -ne 0 ]; then
     echo >&2 "Need xmlstarlet to download a snapshot version"
@@ -69,6 +70,14 @@ if [ ! -r "$builderJar" ]; then
   exit 1
 fi
 
+# Remember last used
+jdbldDirectory=$(getProperty "jdbldDirectory" "_jdbld")
+mkdir -p "$jdbldDirectory/lib"
+if [ ! -r "$jdbldDirectory/lib/.gitignore" ]; then
+  echo "jdrupes-builder-last-used.jar" > "$jdbldDirectory/lib/.gitignore"
+fi
+ln -sf "$builderJar" "$jdbldDirectory/lib/jdrupes-builder-last-used.jar"
+
 # Handle java related options
 
 javaCmd=java
@@ -79,4 +88,4 @@ if [ ! -z "$JAVA_HOME" ]; then
   javaCmd="$JAVA_HOME/bin/java"
 fi
 
-$javaCmd -Duser.language=en_US -jar "$builderJar" "$@"
+$javaCmd -Duser.language=en_US $JAVA_OPTS -jar "$builderJar" "$@"

@@ -18,26 +18,55 @@
 
 package jdbld;
 
-import static org.jdrupes.builder.api.Intend.*;
+import static jdbld.ExtProps.GitApi;
+import static org.jdrupes.builder.api.Intent.*;
+import static org.jdrupes.builder.api.Project.Properties.Version;
+import static org.jdrupes.builder.java.JavaTypes.JavaSourceTreeType;
+import org.jdrupes.builder.api.BuildException;
 import org.jdrupes.builder.api.Project;
-import static org.jdrupes.builder.api.ResourceRequest.requestFor;
 import org.jdrupes.builder.api.RootProject;
-import org.jdrupes.builder.core.AbstractProject;
+import org.jdrupes.builder.core.AbstractRootProject;
 import org.jdrupes.builder.eclipse.EclipseConfiguration;
+import org.jdrupes.builder.eclipse.EclipseConfigurator;
+import org.jdrupes.builder.mvnrepo.JavadocJarBuilder;
 import org.jdrupes.builder.mvnrepo.MvnPublication;
+import org.jdrupes.builder.mvnrepo.MvnPublisher;
 import org.jdrupes.builder.mvnrepo.PomFile;
+import org.jdrupes.builder.mvnrepo.PomFileGenerator;
+import org.jdrupes.builder.mvnrepo.SourcesJarGenerator;
+import org.jdrupes.gitversioning.api.VersionEvaluator;
+import org.jdrupes.gitversioning.core.DefaultTagFilter;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+
 import static org.jdrupes.builder.mvnrepo.MvnProperties.*;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.Map;
+import org.apache.maven.model.Developer;
+import org.apache.maven.model.License;
+import org.apache.maven.model.Scm;
+import org.eclipse.jgit.api.Git;
+import org.jdrupes.builder.java.JavaCompiler;
+import org.jdrupes.builder.java.JavaProject;
+import org.jdrupes.builder.java.JavaResourceCollector;
+import org.jdrupes.builder.java.Javadoc;
 import org.jdrupes.builder.java.JavadocDirectory;
+import org.jdrupes.builder.java.LibraryBuilder;
 import org.jdrupes.builder.java.LibraryJarFile;
 
-public class Root extends AbstractProject implements RootProject {
+public class Root extends AbstractRootProject {
 
     @Override
-    public void prepareProject(Project project) {
+    public void prepareProject(Project project) throws Exception {
         project.set(ArtifactId, project.name());
-        ProjectPreparation.setupVersion(project);
-        ProjectPreparation.setupCommonGenerators(project);
-        ProjectPreparation.setupEclipseConfigurator(project);
+        setupVersion(project);
+        setupCommonGenerators(project);
+        setupEclipseConfigurator(project);
     }
 
     public Root() {
@@ -48,11 +77,152 @@ public class Root extends AbstractProject implements RootProject {
         dependency(Expose, project(Core.class));
 
         // Commands
-        commandAlias("build", requestFor(LibraryJarFile.class),
-            requestFor(JavadocDirectory.class));
-        commandAlias("javadoc", requestFor(JavadocDirectory.class));
-        commandAlias("eclipse", requestFor(EclipseConfiguration.class));
-        commandAlias("pomFile", requestFor(PomFile.class));
-        commandAlias("mavenPublication", requestFor(MvnPublication.class));
+        commandAlias("build").projects("**")
+            .resources(of(LibraryJarFile.class).using(Supply));
+        commandAlias("javadoc").resources(of(JavadocDirectory.class));
+        commandAlias("eclipse").resources(of(EclipseConfiguration.class));
+        commandAlias("pomFile").resources(of(PomFile.class));
+        commandAlias("mavenPublication").resources(of(MvnPublication.class));
+    }
+
+    private static void setupVersion(Project project) {
+        try {
+            if (project instanceof RootProject) {
+                project.set(GitApi, Git.open(project.directory().toFile()));
+            }
+        } catch (IOException e) {
+            throw new BuildException().cause(e);
+        }
+
+        var evaluator = VersionEvaluator
+            .forRepository(project.<Git> get(GitApi).getRepository())
+            .subDirectory(project.directory())
+            .tagFilter(new DefaultTagFilter().prepend(project.name() + "-"));
+        project.set(Version, evaluator.version());
+    }
+
+    private static void setupCommonGenerators(Project project) {
+        if (project instanceof JavaProject) {
+            project.generator(JavaCompiler::new)
+                .addSources(Path.of("src"), "**/*.java")
+                .options("--release", "21");
+            project.generator(JavaResourceCollector::new)
+                .add(Path.of("resources"), "**/*");
+
+            // Provide POM
+            project.dependency(Supply, PomFileGenerator::new)
+                .adaptPom(model -> {
+                    model.setDescription("See URL.");
+                    model.setUrl("https://jdrupes.org/");
+                    var scm = new Scm();
+                    scm.setUrl(
+                        "https://github.com/jdrupes/jdrupes-gitversioning");
+                    scm.setConnection(
+                        "scm:git://github.com/jdrupes/jdrupes-gitversioning.git");
+                    scm.setDeveloperConnection(
+                        "scm:git://github.com/jdrupes/jdrupes-gitversioning.git");
+                    model.setScm(scm);
+                    var license = new License();
+                    license.setName("AGPL 3.0");
+                    license.setUrl(
+                        "https://www.gnu.org/licenses/agpl-3.0.en.html");
+                    license.setDistribution("repo");
+                    model.setLicenses(List.of(license));
+                    var developer = new Developer();
+                    developer.setId("mnlipp");
+                    developer.setName("Michael N. Lipp");
+                    model.setDevelopers(List.of(developer));
+                });
+
+            // Provide library jar
+            project.dependency(Supply, new LibraryBuilder(project)
+                .addFrom(project.providers().select(Supply))
+                .addEntries(project.resources(
+                    project.of(PomFile.class).using(Supply))
+                    .map(pomFile -> Map.entry(Path.of("META-INF/maven")
+                        .resolve((String) project.get(GroupId))
+                        .resolve(project.name())
+                        .resolve("pom.xml"), pomFile))));
+
+            // Supply sources jar
+            project.generator(SourcesJarGenerator::new).addTrees(
+                project.resources(project.of(
+                    JavaSourceTreeType).using(Supply, Expose)));
+
+            // Supply javadoc
+            project.generator(Javadoc::new)
+                .options("-overview", project.rootProject().directory()
+                    .resolve("overview.html").toString())
+                .options("--add-stylesheet", project.rootProject().directory()
+                    .resolve("misc/javadoc-overwrites.css").toString())
+                .options("--add-script", project.rootProject().directory()
+                    .resolve("misc/highlight.min.js").toString())
+                .options("--add-script", project.rootProject().directory()
+                    .resolve("misc/highlight-all.js").toString())
+                .options("--add-stylesheet", project.rootProject().directory()
+                    .resolve("misc/highlight-default.css").toString())
+                .options("-bottom", project.rootProject().readString(
+                    Path.of("misc/javadoc.bottom.txt")))
+                .options("--allow-script-in-comments")
+                .options("-linksource")
+                .options("-link",
+                    "https://docs.oracle.com/en/java/javase/21/docs/api/")
+                .options("-quiet");
+
+            // Supply javadoc jar
+            project.generator(JavadocJarBuilder::new);
+
+            // Publish (deploy). Credentials and signing information is
+            // obtained through properties.
+            project.generator(MvnPublisher::new);
+        }
+    }
+
+    private static void setupEclipseConfigurator(Project project) {
+        project.generator(new EclipseConfigurator(project)
+            .eclipseAlias(project instanceof RootProject ? project.name()
+                : project.get(GroupId) + "." + project.name())
+            .adaptProjectConfiguration((Document doc,
+                    Node buildSpec, Node natures) -> {
+                if (project instanceof JavaProject) {
+                    var cmd = buildSpec
+                        .appendChild(doc.createElement("buildCommand"));
+                    cmd.appendChild(doc.createElement("name"))
+                        .appendChild(doc.createTextNode(
+                            "net.sf.eclipsecs.core.CheckstyleBuilder"));
+                    cmd.appendChild(doc.createElement("arguments"));
+                    natures.appendChild(doc.createElement("nature"))
+                        .appendChild(doc.createTextNode(
+                            "net.sf.eclipsecs.core.CheckstyleNature"));
+                    cmd = buildSpec
+                        .appendChild(doc.createElement("buildCommand"));
+                    cmd.appendChild(doc.createElement("name"))
+                        .appendChild(doc.createTextNode(
+                            "ch.acanda.eclipse.pmd.builder.PMDBuilder"));
+                    cmd.appendChild(doc.createElement("arguments"));
+                    natures.appendChild(doc.createElement("nature"))
+                        .appendChild(doc.createTextNode(
+                            "ch.acanda.eclipse.pmd.builder.PMDNature"));
+                }
+            }).adaptConfiguration(() -> {
+                if (!(project instanceof JavaProject)) {
+                    return;
+                }
+                try {
+                    Files.copy(
+                        Root.class.getResourceAsStream("net.sf.jautodoc.prefs"),
+                        project.directory()
+                            .resolve(".settings/net.sf.jautodoc.prefs"),
+                        StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(Root.class.getResourceAsStream("checkstyle"),
+                        project.directory().resolve(".checkstyle"),
+                        StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(Root.class.getResourceAsStream("eclipse-pmd"),
+                        project.directory().resolve(".eclipse-pmd"),
+                        StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                    throw new BuildException().cause(e);
+                }
+            }));
     }
 }
