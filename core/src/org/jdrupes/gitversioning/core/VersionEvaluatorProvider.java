@@ -67,7 +67,6 @@ public class VersionEvaluatorProvider
     /**
      * Initializes a new version evaluator provider.
      */
-    @SuppressWarnings("PMD.UnnecessaryConstructor")
     public VersionEvaluatorProvider() {
         // Make javadoc happy.
     }

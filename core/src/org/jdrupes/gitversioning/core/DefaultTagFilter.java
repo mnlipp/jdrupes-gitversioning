@@ -40,7 +40,6 @@ public class DefaultTagFilter implements TagFilter {
     /**
      * Initializes a new tag filter that uses the {@link #VERSION_PATTERN}.
      */
-    @SuppressWarnings("PMD.UnnecessaryConstructor")
     public DefaultTagFilter() {
         // Make javadoc happy
     }
