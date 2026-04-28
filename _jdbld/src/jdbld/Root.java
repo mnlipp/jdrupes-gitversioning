@@ -24,23 +24,22 @@ import static org.jdrupes.builder.api.Project.Properties.Version;
 import static org.jdrupes.builder.java.JavaTypes.JavaSourceTreeType;
 import org.jdrupes.builder.api.BuildException;
 import org.jdrupes.builder.api.Project;
+import org.jdrupes.builder.api.ResourceType;
 import org.jdrupes.builder.api.RootProject;
 import org.jdrupes.builder.core.AbstractRootProject;
 import org.jdrupes.builder.eclipse.EclipseConfiguration;
 import org.jdrupes.builder.eclipse.EclipseConfigurator;
+import static org.jdrupes.builder.java.JavaTypes.*;
 import org.jdrupes.builder.mvnrepo.JavadocJarBuilder;
-import org.jdrupes.builder.mvnrepo.MvnPublication;
 import org.jdrupes.builder.mvnrepo.MvnPublisher;
-import org.jdrupes.builder.mvnrepo.PomFile;
+import static org.jdrupes.builder.mvnrepo.MvnRepoTypes.*;
 import org.jdrupes.builder.mvnrepo.PomFileGenerator;
 import org.jdrupes.builder.mvnrepo.SourcesJarGenerator;
 import org.jdrupes.gitversioning.api.VersionEvaluator;
 import org.jdrupes.gitversioning.core.DefaultTagFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
-
 import static org.jdrupes.builder.mvnrepo.MvnProperties.*;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,9 +54,7 @@ import org.jdrupes.builder.java.JavaCompiler;
 import org.jdrupes.builder.java.JavaProject;
 import org.jdrupes.builder.java.JavaResourceCollector;
 import org.jdrupes.builder.java.Javadoc;
-import org.jdrupes.builder.java.JavadocDirectory;
 import org.jdrupes.builder.java.LibraryBuilder;
-import org.jdrupes.builder.java.LibraryJarFile;
 
 public class Root extends AbstractRootProject {
 
@@ -78,11 +75,12 @@ public class Root extends AbstractRootProject {
 
         // Commands
         commandAlias("build").projects("**")
-            .resources(of(LibraryJarFile.class).using(Supply));
-        commandAlias("javadoc").resources(of(JavadocDirectory.class));
-        commandAlias("eclipse").resources(of(EclipseConfiguration.class));
-        commandAlias("pomFile").resources(of(PomFile.class));
-        commandAlias("mavenPublication").resources(of(MvnPublication.class));
+            .resources(of(LibraryJarFileType).using(Supply));
+        commandAlias("javadoc").resources(of(JavadocDirectoryType));
+        commandAlias("eclipse").resources(of(
+            new ResourceType<EclipseConfiguration>() {}));
+        commandAlias("pomFile").resources(of(PomFileType));
+        commandAlias("mavenPublication").resources(of(MvnPublicationType));
     }
 
     private static void setupVersion(Project project) {
@@ -138,7 +136,7 @@ public class Root extends AbstractRootProject {
             project.dependency(Supply, new LibraryBuilder(project)
                 .addFrom(project.providers().select(Supply))
                 .addEntries(project.resources(
-                    project.of(PomFile.class).using(Supply))
+                    project.of(PomFileType).using(Supply))
                     .map(pomFile -> Map.entry(Path.of("META-INF/maven")
                         .resolve((String) project.get(GroupId))
                         .resolve(project.name())
