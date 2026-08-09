@@ -28,7 +28,7 @@ public class Core extends AbstractProject implements JavaProject {
     public Core() {
         super(name("core"));
         dependency(Expose, project(Api.class));
-        dependency(Consume, new MvnRepoLookup()
+        dependency(Reveal, new MvnRepoLookup()
             .resolve("com.vdurmont:semver4j:3.1.0"));
     }
 
