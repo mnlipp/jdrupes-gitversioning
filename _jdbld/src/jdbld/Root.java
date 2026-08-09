@@ -20,7 +20,7 @@ package jdbld;
 
 import static jdbld.ExtProps.GitApi;
 import static org.jdrupes.builder.api.Intent.*;
-import static org.jdrupes.builder.java.JavaTypes.JavaSourceTreeType;
+
 import org.jdrupes.builder.api.BuildException;
 import org.jdrupes.builder.api.Project;
 import org.jdrupes.builder.api.ResourceType;
@@ -33,6 +33,7 @@ import static org.jdrupes.builder.java.JavaTypes.*;
 import org.jdrupes.builder.mvnrepo.JavadocJarBuilder;
 import org.jdrupes.builder.mvnrepo.MvnDeployDestination;
 import org.jdrupes.builder.mvnrepo.MvnPublisher;
+import org.jdrupes.builder.mvnrepo.MvnRepoLookup;
 import org.jdrupes.builder.mvnrepo.MvnVersionType;
 
 import static org.jdrupes.builder.mvnrepo.MvnRepoTypes.*;
@@ -50,6 +51,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+
 import org.apache.maven.model.Developer;
 import org.apache.maven.model.License;
 import org.apache.maven.model.Scm;
@@ -76,6 +79,35 @@ public class Root extends AbstractRootProject {
 
         dependency(Expose, project(Api.class));
         dependency(Expose, project(Core.class));
+
+        // Supply overall javadoc
+        generator(Javadoc::new).projects(Stream.of(this, project(Api.class),
+            project(Core.class)))
+            .destination(rootProject().directory().resolve("webpages/javadoc"))
+            .tagletpath(new MvnRepoLookup()
+                .resolve("org.jdrupes.taglets:plantuml-taglet:3.1.0",
+                    "net.sourceforge.plantuml:plantuml:1.2023.11")
+                .resources(of(ClasspathElementType).using(Supply, Expose)))
+            .taglets(Stream.of("org.jdrupes.taglets.plantUml.PlantUml",
+                "org.jdrupes.taglets.plantUml.StartUml",
+                "org.jdrupes.taglets.plantUml.EndUml"))
+            .options("-overview",
+                directory().resolve("overview.html").toString())
+            .options("--add-stylesheet",
+                directory().resolve("misc/javadoc-overwrites.css").toString())
+            .options("--add-script",
+                directory().resolve("misc/highlight.min.js").toString())
+            .options("--add-script",
+                directory().resolve("misc/highlight-all.js").toString())
+            .options("--add-stylesheet",
+                directory().resolve("misc/highlight-default.css").toString())
+            .options("-bottom",
+                readString(directory().resolve("misc/javadoc.bottom.txt")))
+            .options("--allow-script-in-comments")
+            .options("-linksource")
+            .options("-link",
+                "https://docs.oracle.com/en/java/javase/25/docs/api/")
+            .options("-quiet");
 
         // Commands
         commandAlias("build").projects("**")

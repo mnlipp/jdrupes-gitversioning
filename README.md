@@ -21,4 +21,4 @@ repositories {
 ```
 
 Documentation is available 
-[here](https://mnlipp.github.io/JDrupes-GitVersioning/).
+[here](https://mnlipp.github.io/jdrupes-gitversioning/).
