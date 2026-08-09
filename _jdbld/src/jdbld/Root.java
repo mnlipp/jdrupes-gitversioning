@@ -20,27 +20,31 @@ package jdbld;
 
 import static jdbld.ExtProps.GitApi;
 import static org.jdrupes.builder.api.Intent.*;
-import static org.jdrupes.builder.api.Project.Properties.Version;
 import static org.jdrupes.builder.java.JavaTypes.JavaSourceTreeType;
 import org.jdrupes.builder.api.BuildException;
 import org.jdrupes.builder.api.Project;
 import org.jdrupes.builder.api.ResourceType;
 import org.jdrupes.builder.api.RootProject;
 import org.jdrupes.builder.core.AbstractRootProject;
+import static org.jdrupes.builder.api.CoreProperties.*;
 import org.jdrupes.builder.eclipse.EclipseConfiguration;
 import org.jdrupes.builder.eclipse.EclipseConfigurator;
 import static org.jdrupes.builder.java.JavaTypes.*;
 import org.jdrupes.builder.mvnrepo.JavadocJarBuilder;
+import org.jdrupes.builder.mvnrepo.MvnDeployDestination;
 import org.jdrupes.builder.mvnrepo.MvnPublisher;
+import org.jdrupes.builder.mvnrepo.MvnVersionType;
+
 import static org.jdrupes.builder.mvnrepo.MvnRepoTypes.*;
 import org.jdrupes.builder.mvnrepo.PomFileGenerator;
-import org.jdrupes.builder.mvnrepo.SourcesJarGenerator;
+import org.jdrupes.builder.mvnrepo.SourcesJarBuilder;
 import org.jdrupes.gitversioning.api.VersionEvaluator;
 import org.jdrupes.gitversioning.core.DefaultTagFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import static org.jdrupes.builder.mvnrepo.MvnProperties.*;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -143,7 +147,7 @@ public class Root extends AbstractRootProject {
                         .resolve("pom.xml"), pomFile))));
 
             // Supply sources jar
-            project.generator(SourcesJarGenerator::new).addTrees(
+            project.generator(SourcesJarBuilder::new).addTrees(
                 project.resources(project.of(
                     JavaSourceTreeType).using(Supply, Expose)));
 
@@ -171,8 +175,13 @@ public class Root extends AbstractRootProject {
             project.generator(JavadocJarBuilder::new);
 
             // Publish (deploy). Credentials and signing information is
-            // obtained through properties.
-            project.generator(MvnPublisher::new);
+            // obtained through properties and/or settings.xml.
+            project.generator(MvnPublisher::new).destinations(
+                new MvnDeployDestination(MvnVersionType.SNAPSHOT,
+                    MvnVersionType.RELEASE).repositoryUri(
+                        URI.create(
+                            "https://codeberg.org/api/packages/JDrupes/maven"))
+                        .id("codeberg"));
         }
     }
 
