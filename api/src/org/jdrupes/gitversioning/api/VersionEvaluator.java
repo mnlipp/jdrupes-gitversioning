@@ -81,13 +81,14 @@ public interface VersionEvaluator {
             throws GitAPIException {
         try (Git git = Git.wrap(repository)) {
             Status status = git.status().call();
-            String start = subDir == null ? "" : subDir.toString();
+            var useAll = subDir == null || Path.of("").equals(subDir);
 
             // Uncommitted combines added, changed, removed, missing,
             // modified and conflicting
             return Stream.concat(status.getUncommittedChanges().stream(),
                 status.getUntracked().stream()).map(Path::of)
-                .filter(path -> path.startsWith(start)).toList();
+                .filter(path -> useAll || path.startsWith(subDir))
+                .toList();
         }
     }
 
