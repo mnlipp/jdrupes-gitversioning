@@ -95,7 +95,7 @@ public class MavenStyleTagProcessor extends TagProcessorBase {
             return version;
         }
         if (commit != null && commit.equals(repository.resolve("HEAD"))
-            && !VersionEvaluator.isDirty(repository, subDir)) {
+            && VersionEvaluator.dirtyFiles(repository, subDir).isEmpty()) {
             return version;
         }
 

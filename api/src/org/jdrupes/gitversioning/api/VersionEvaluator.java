@@ -19,6 +19,7 @@
 package org.jdrupes.gitversioning.api;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
@@ -68,34 +69,25 @@ public interface VersionEvaluator {
     }
 
     /**
-     * Checks if the sub directory contains that have been added, removed
-     * or modified since the last commit.
+     * Searches the sub directory for changes (any of combines added,
+     * changed, removed, missing, modified, conflicting or untracked). 
      *
      * @param repository the repository
      * @param subDir the sub dir
      * @return true, if is dirty
      * @throws GitAPIException the git API exception
      */
-    static boolean isDirty(Repository repository, Path subDir)
+    static List<Path> dirtyFiles(Repository repository, Path subDir)
             throws GitAPIException {
         try (Git git = Git.wrap(repository)) {
             Status status = git.status().call();
             String start = subDir == null ? "" : subDir.toString();
 
-            return status.getModified().stream()
-                .anyMatch(path -> path.startsWith(start))
-                || status.getUntracked().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getUncommittedChanges().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getMissing().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getConflicting().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getAdded().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getRemoved().stream()
-                    .anyMatch(path -> path.startsWith(start));
+            // Uncommitted combines added, changed, removed, missing,
+            // modified and conflicting
+            return Stream.concat(status.getUncommittedChanges().stream(),
+                status.getUntracked().stream()).map(Path::of)
+                .filter(path -> path.startsWith(start)).toList();
         }
     }
 
