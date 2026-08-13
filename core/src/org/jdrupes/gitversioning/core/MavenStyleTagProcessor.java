@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.jdrupes.gitversioning.api.VersionEvaluator;
 
 /**
  * A maven style tag processor.
@@ -94,7 +95,7 @@ public class MavenStyleTagProcessor extends TagProcessorBase {
             return version;
         }
         if (commit != null && commit.equals(repository.resolve("HEAD"))
-            && !isDirty(repository, subDir)) {
+            && !VersionEvaluator.isDirty(repository, subDir)) {
             return version;
         }
 

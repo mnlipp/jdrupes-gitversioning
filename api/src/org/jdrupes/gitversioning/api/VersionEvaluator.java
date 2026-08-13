@@ -23,6 +23,9 @@ import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
 import java.util.stream.Stream;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -62,6 +65,38 @@ public interface VersionEvaluator {
                 .stream())
             .flatMap(s -> s).findFirst().map(Provider::get).orElseThrow()
             .repository(repository);
+    }
+
+    /**
+     * Checks if the sub directory contains that have been added, removed
+     * or modified since the last commit.
+     *
+     * @param repository the repository
+     * @param subDir the sub dir
+     * @return true, if is dirty
+     * @throws GitAPIException the git API exception
+     */
+    static boolean isDirty(Repository repository, Path subDir)
+            throws GitAPIException {
+        try (Git git = Git.wrap(repository)) {
+            Status status = git.status().call();
+            String start = subDir == null ? "" : subDir.toString();
+
+            return status.getModified().stream()
+                .anyMatch(path -> path.startsWith(start))
+                || status.getUntracked().stream()
+                    .anyMatch(path -> path.startsWith(start))
+                || status.getUncommittedChanges().stream()
+                    .anyMatch(path -> path.startsWith(start))
+                || status.getMissing().stream()
+                    .anyMatch(path -> path.startsWith(start))
+                || status.getConflicting().stream()
+                    .anyMatch(path -> path.startsWith(start))
+                || status.getAdded().stream()
+                    .anyMatch(path -> path.startsWith(start))
+                || status.getRemoved().stream()
+                    .anyMatch(path -> path.startsWith(start));
+        }
     }
 
     /**

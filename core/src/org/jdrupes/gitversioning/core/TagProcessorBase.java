@@ -18,12 +18,7 @@
 
 package org.jdrupes.gitversioning.core;
 
-import java.nio.file.Path;
 import java.util.logging.Logger;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.Repository;
 import org.jdrupes.gitversioning.api.TagProcessor;
 
 /**
@@ -41,35 +36,4 @@ public abstract class TagProcessorBase implements TagProcessor {
         // Make javadoc happy.
     }
 
-    /**
-     * Checks if the sub directory contains that have been added, removed
-     * or modified since the last commit.
-     *
-     * @param repository the repository
-     * @param subDir the sub dir
-     * @return true, if is dirty
-     * @throws GitAPIException the git API exception
-     */
-    protected static boolean isDirty(Repository repository, Path subDir)
-            throws GitAPIException {
-        try (Git git = Git.wrap(repository)) {
-            Status status = git.status().call();
-            String start = subDir == null ? "" : subDir.toString();
-
-            return status.getModified().stream()
-                .anyMatch(path -> path.startsWith(start))
-                || status.getUntracked().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getUncommittedChanges().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getMissing().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getConflicting().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getAdded().stream()
-                    .anyMatch(path -> path.startsWith(start))
-                || status.getRemoved().stream()
-                    .anyMatch(path -> path.startsWith(start));
-        }
-    }
 }
