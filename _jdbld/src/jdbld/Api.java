@@ -29,7 +29,7 @@ public class Api extends AbstractProject implements JavaProject {
     public Api() {
         super(name("api"));
         dependency(Expose, new MvnRepoLookup()
-            .resolve("org.eclipse.jgit:org.eclipse.jgit:7.3.0.202506031305-r"));
+            .resolve("org.eclipse.jgit:org.eclipse.jgit:7.7.1.202607240634-r"));
     }
 
 }
