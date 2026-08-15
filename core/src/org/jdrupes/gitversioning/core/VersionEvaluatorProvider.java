@@ -79,12 +79,29 @@ public class VersionEvaluatorProvider
 
     @Override
     public VersionEvaluator subDirectory(Path subDirectory) {
-        if (subDirectory.isAbsolute()) {
-            subDirectory = subDirectory.relativize(
-                repository.getWorkTree().toPath());
-        }
-        directory = subDirectory;
+        directory = relativizeDirectory(repository, subDirectory);
         return this;
+    }
+
+    /**
+     * If sub directory is absolute, return it as a path relative
+     * to the repository's work tree.
+     *
+     * @param repository the repository
+     * @param subDirectory the sub directory
+     * @return the path
+     */
+    /* default */ static Path relativizeDirectory(Repository repository,
+            Path subDirectory) {
+        if (!subDirectory.isAbsolute()) {
+            return subDirectory;
+        }
+        if (!subDirectory.startsWith(
+            repository.getWorkTree().toPath().toAbsolutePath())) {
+            throw new IllegalArgumentException(subDirectory
+                + " is not a directory within the working tree");
+        }
+        return repository.getWorkTree().toPath().relativize(subDirectory);
     }
 
     @Override

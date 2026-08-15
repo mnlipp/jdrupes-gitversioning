@@ -102,15 +102,8 @@ public class MavenStyleTagProcessor extends TagProcessorBase {
         if (subDir == null) {
             subDir = Path.of("");
         }
-        if (subDir.isAbsolute()) {
-            if (!subDir.startsWith(
-                repository.getWorkTree().toPath().toAbsolutePath())) {
-                throw new IllegalArgumentException(subDir
-                    + " is not a directory within the working tree");
-            }
-            subDir = repository.getWorkTree().toPath().toAbsolutePath()
-                .relativize(subDir);
-        }
+        subDir = VersionEvaluatorProvider
+            .relativizeDirectory(repository, subDir);
         if (commit != null && isVersionClean(repository, subDir, commit)) {
             return version;
         }
