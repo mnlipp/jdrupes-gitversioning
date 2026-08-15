@@ -20,7 +20,7 @@ package jdbld;
 
 import static jdbld.ExtProps.GitApi;
 import static org.jdrupes.builder.api.Intent.*;
-
+import static org.jdrupes.builder.api.ResourceType.ProjectVersionType;
 import org.jdrupes.builder.api.BuildException;
 import org.jdrupes.builder.api.Project;
 import org.jdrupes.builder.api.ResourceType;
@@ -35,7 +35,6 @@ import org.jdrupes.builder.mvnrepo.MvnDeployDestination;
 import org.jdrupes.builder.mvnrepo.MvnPublisher;
 import org.jdrupes.builder.mvnrepo.MvnRepoLookup;
 import org.jdrupes.builder.mvnrepo.MvnVersionType;
-
 import static org.jdrupes.builder.mvnrepo.MvnRepoTypes.*;
 import org.jdrupes.builder.mvnrepo.PomFileGenerator;
 import org.jdrupes.builder.mvnrepo.SourcesJarBuilder;
@@ -52,7 +51,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-
 import org.apache.maven.model.Developer;
 import org.apache.maven.model.License;
 import org.apache.maven.model.Scm;
@@ -110,6 +108,8 @@ public class Root extends AbstractRootProject {
             .options("-quiet");
 
         // Commands
+        commandAlias("version").projects("**")
+            .resources(of(ProjectVersionType).using(Supply));
         commandAlias("build").projects("**")
             .resources(of(LibraryJarFileType).using(Supply));
         commandAlias("javadoc").resources(of(JavadocDirectoryType));
