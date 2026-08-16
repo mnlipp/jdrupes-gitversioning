@@ -21,7 +21,10 @@ package org.jdrupes.gitversioning.api;
 import java.util.Optional;
 
 /**
- * The Interface TagFilter.
+ * Determines whether a tag name represents a version tag and extracts
+ * the version string from it.
+ *
+ * <p>Used by the evaluator to identify which tags are version-relevant.
  */
 @FunctionalInterface
 public interface TagFilter {
@@ -29,8 +32,8 @@ public interface TagFilter {
     /**
      * Returns the version part of the tag if the tag matches.
      *
-     * @param tagName the tag name
-     * @return the optional
+     * @param tagName the full tag name (without {@code refs/tags/} prefix)
+     * @return the version string if the tag matches, empty otherwise
      */
     Optional<String> version(String tagName);
 }

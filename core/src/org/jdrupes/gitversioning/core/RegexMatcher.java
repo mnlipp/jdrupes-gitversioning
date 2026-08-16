@@ -23,16 +23,18 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 /**
- * The Class RegexMatcher.
+ * Matches paths against a Java regular expression.
+ *
+ * <p>Delegates to {@link PathMatcher} with the {@code regex:} scheme.
  */
 public class RegexMatcher implements IncludeMatcher {
 
     private final PathMatcher matcher;
 
     /**
-     * Initializes a new regex matcher.
+     * Creates a new regex matcher.
      *
-     * @param pattern the pattern
+     * @param pattern the regular expression pattern
      */
     public RegexMatcher(String pattern) {
         matcher = FileSystems.getDefault().getPathMatcher("regex:" + pattern);

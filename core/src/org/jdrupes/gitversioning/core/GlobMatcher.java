@@ -23,16 +23,18 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 /**
- * The Class GlobMatcher.
+ * Matches paths against a glob expression.
+ *
+ * <p>Delegates to {@link PathMatcher} with the {@code glob:} scheme.
  */
 public class GlobMatcher implements IncludeMatcher {
 
     private final PathMatcher matcher;
 
     /**
-     * Initializes a new glob matcher.
+     * Creates a new glob matcher.
      *
-     * @param pattern the pattern
+     * @param pattern the glob pattern
      */
     public GlobMatcher(String pattern) {
         matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);

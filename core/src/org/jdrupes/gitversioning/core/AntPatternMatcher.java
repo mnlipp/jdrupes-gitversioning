@@ -22,7 +22,10 @@ import io.github.azagniotov.matcher.AntPathMatcher;
 import java.nio.file.Path;
 
 /**
- * The Class AntPatternMatcher.
+ * Matches paths against an Ant-style pattern.
+ *
+ * <p>Supports {@code *}, {@code **}, and {@code ?} wildcards via the
+ * ant-style-path-matcher library.
  */
 public class AntPatternMatcher implements IncludeMatcher {
 
@@ -32,9 +35,9 @@ public class AntPatternMatcher implements IncludeMatcher {
     private final String pattern;
 
     /**
-     * Initializes a new ant pattern matcher.
+     * Creates a new Ant pattern matcher.
      *
-     * @param pattern the pattern
+     * @param pattern the Ant-style pattern
      */
     public AntPatternMatcher(String pattern) {
         this.pattern = pattern;

@@ -22,22 +22,26 @@ import java.io.IOException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
 /**
- * A [TagProcessor] generates a version based on information retrieved from
- * a git repository.
+ * Generates a version string from Git repository information.
+ *
+ * <p>Receives the evaluated tag name and parsed version, then produces the
+ * final version string. Implementations typically incorporate information
+ * about dirty files, commit count, or branch name.
  */
 @FunctionalInterface
 public interface TagProcessor {
 
     /**
-     * Generate the version.
+     * Generates the version string.
      *
-     * @param evaluator the version evaluator
-     * @param tagName the tag's name. May be null if no such tag exists.
-     * @param version the version part of the tag. Defaults to "0.0.0" if
-     * no tag was found.
-     * @return the version
-     * @throws IOException is handled by the invoker as a convenience
-     * @throws GitAPIException is handled by the invoker as a convenience
+     * @param evaluator the version evaluator, providing access to the
+     * repository state (dirty files, modified files, etc.)
+     * @param tagName the tag name, or {@code null} if no matching tag exists
+     * @param version the parsed version from the tag, defaults to {@code 0.0.0}
+     * if no tag matches
+     * @return the version string
+     * @throws IOException if an I/O error occurs accessing the repository
+     * @throws GitAPIException if a Git operation fails
      */
     String version(VersionEvaluator evaluator,
             String tagName, String version) throws IOException, GitAPIException;

@@ -23,13 +23,17 @@ import java.util.regex.Pattern;
 import org.jdrupes.gitversioning.api.TagFilter;
 
 /**
- * A default implementation of {@link TagFilter}.
+ * Default implementation of {@link TagFilter} based on a regular expression.
+ *
+ * <p>Matches tags against a pattern that must contain exactly one capture
+ * group for the version string. The default pattern ({@link #VERSION_PATTERN})
+ * matches standard semver-style versions.
  */
 public class DefaultTagFilter implements TagFilter {
 
     /**
-     * The default version pattern.
-     * {@code ([0-9]+(?:\.[0-9]+){0,2}(?:-[a-zA-Z0-9\+\-_]+)?)}
+     * The default version pattern that matches semver-style version strings.
+     * Pattern: {@code ([0-9]+(?:\.[0-9]+){0,2}(?:-[a-zA-Z0-9\+\-_]+)?)}
      */
     public static final String VERSION_PATTERN
         = "([0-9]+(?:\\.[0-9]+){0,2}(?:-[a-zA-Z0-9\\+\\-_]+)?)";
@@ -38,18 +42,18 @@ public class DefaultTagFilter implements TagFilter {
     private Pattern compiledPattern;
 
     /**
-     * Initializes a new tag filter that uses the {@link #VERSION_PATTERN}.
+     * Creates a filter using the {@link #VERSION_PATTERN}.
      */
     public DefaultTagFilter() {
-        // Make javadoc happy
+        // Make javadoc happy.
     }
 
     /**
-     * Sets the pattern. The pattern must have a single capture group
-     * that matches the version.
+     * Sets the pattern. The pattern must contain exactly one capture group
+     * that extracts the version string.
      *
-     * @param pattern the pattern
-     * @return the default tag filer
+     * @param pattern the regular expression pattern
+     * @return this filter for chaining
      */
     public DefaultTagFilter pattern(String pattern) {
         this.pattern = pattern;
@@ -57,11 +61,11 @@ public class DefaultTagFilter implements TagFilter {
     }
 
     /**
-     * Prepend the prefix to the existing pattern. This is the most
-     * common use case.
+     * Prepends a prefix to the current pattern. Use this to match tags
+     * with a common prefix (e.g. {@code "release-"}).
      *
-     * @param prefix the prefix
-     * @return the default tag filer
+     * @param prefix the prefix string
+     * @return this filter for chaining
      */
     public DefaultTagFilter prepend(String prefix) {
         pattern = prefix + pattern;

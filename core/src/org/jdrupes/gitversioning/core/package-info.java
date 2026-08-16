@@ -17,6 +17,11 @@
  */
 
 /**
- * Simple implementation classes.
+ * Reference implementation of the GitVersioning API.
+ *
+ * <p>Provides {@link org.jdrupes.gitversioning.core.VersionEvaluatorProvider},
+ * {@link org.jdrupes.gitversioning.core.DefaultTagFilter},
+ * {@link org.jdrupes.gitversioning.core.MavenStyleTagProcessor}, and
+ * supporting matcher classes.
  */
 package org.jdrupes.gitversioning.core;

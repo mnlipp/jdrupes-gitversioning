@@ -22,15 +22,17 @@ import java.util.logging.Logger;
 import org.jdrupes.gitversioning.api.TagProcessor;
 
 /**
- * A base class for {@link TagProcessor}s.
+ * Abstract base class for {@link TagProcessor} implementations.
+ *
+ * <p>Provides a {@link Logger} instance.
  */
 public abstract class TagProcessorBase implements TagProcessor {
 
-    /** The logger. */
+    /** Logger for the concrete subclass. */
     protected final Logger log = Logger.getLogger(getClass().getName());
 
     /**
-     * Initializes a new tag processor base.
+     * Creates a new tag processor base.
      */
     protected TagProcessorBase() {
         // Make javadoc happy.

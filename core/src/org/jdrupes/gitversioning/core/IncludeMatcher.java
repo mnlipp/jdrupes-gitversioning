@@ -21,16 +21,19 @@ package org.jdrupes.gitversioning.core;
 import java.nio.file.Path;
 
 /**
- * The Interface IncludeMatcher.
+ * Matches a file path against a pattern.
+ *
+ * <p>Internal interface used by {@link VersionEvaluatorProvider} to
+ * determine which files are relevant for version evaluation.
  */
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface IncludeMatcher {
 
     /**
-     * Checks is the path matches.
+     * Checks whether the path matches the pattern.
      *
-     * @param path the path
-     * @return true, if successful
+     * @param path the file path (relative to the work tree)
+     * @return {@code true} if the path matches
      */
     boolean matches(Path path);
 }

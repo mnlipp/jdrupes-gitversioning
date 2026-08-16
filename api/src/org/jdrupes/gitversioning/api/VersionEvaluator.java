@@ -26,23 +26,28 @@ import java.util.stream.Stream;
 import org.eclipse.jgit.lib.Repository;
 
 /**
- * Defines a configurable version evaluator.
- * 
- * By default, all files in the work tree are included when evaluating
- * the version. This can be changed using the "{@code matching}..." methods
- * (and {@link #subDirectory(Path)}). The file selection by these methods
- * is accumulative, i.e. is a logical OR of the matching rules.
+ * Configurable version evaluator for a Git repository.
+ *
+ * <p>By default, all files in the work tree are considered when evaluating
+ * the version. Restrict the scope using the {@code matching*} methods or
+ * {@link #subDirectory(java.nio.file.Path)}. Multiple matchers are combined
+ * with a logical OR.
+ *
+ * <p>Obtain an instance via {@link #forRepository(Repository)}
+ * or {@link #forRepository(Repository, ClassLoader)}.
  */
 public interface VersionEvaluator {
 
     /**
      * Creates a version evaluator for the given repository. The
-     * implementation is looked up using the [ServiceLoader] mechanism
+     * implementation is looked up using the {@link ServiceLoader} mechanism
      * with the given class loader.
      *
      * @param repository the repository
-     * @param classLoader the class loader
+     * @param classLoader the class loader to use for service loading
      * @return the version evaluator
+     * @throws java.util.NoSuchElementException if no
+     * {@link VersionEvaluatorProvider} is available
      */
     static VersionEvaluator forRepository(Repository repository,
             ClassLoader classLoader) {
@@ -53,12 +58,14 @@ public interface VersionEvaluator {
 
     /**
      * Creates a version evaluator for the given repository. The
-     * implementation is looked up using the [ServiceLoader] mechanism,
-     * using the class loaders of the current thread and the
-     * [VersionEvaluator] class.
+     * implementation is looked up using the {@link ServiceLoader} mechanism,
+     * trying the context class loader of the current thread and the class
+     * loader of this class.
      *
      * @param repository the repository
      * @return the version evaluator
+     * @throws java.util.NoSuchElementException if no
+     * {@link VersionEvaluatorProvider} is available
      */
     static VersionEvaluator forRepository(Repository repository) {
         return Stream.of(Thread.currentThread().getContextClassLoader(),
@@ -70,41 +77,45 @@ public interface VersionEvaluator {
     }
 
     /**
-     * Returns the evalutor's repository.
+     * Returns the evaluator's repository.
      *
      * @return the repository
      */
     Repository repository();
 
     /**
-     * Sets the tag filter to use.
+     * Sets the tag filter to use. The filter determines which tags are
+     * recognized as version tags and extracts the version string from them.
      *
      * @param tagFilter the tag filter
-     * @return the version evaluator
+     * @return this evaluator for chaining
      */
     VersionEvaluator tagFilter(TagFilter tagFilter);
 
     /**
-     * Sets the tag processor to use.
+     * Sets the tag processor to use. The processor generates the final
+     * version string from the tag name and parsed version.
      *
      * @param tagProcessor the tag processor
-     * @return the version evaluator
+     * @return this evaluator for chaining
      */
     VersionEvaluator tagProcessor(TagProcessor tagProcessor);
 
     /**
-     * Include all files matching the given glob when evaluating the version.
+     * Include all files matching the given glob expression when evaluating
+     * the version.
      *
      * @param glob the glob expression
-     * @return the version evaluator
+     * @return this evaluator for chaining
      */
     VersionEvaluator matchingGlob(String glob);
 
     /**
-     * Include all files matching the given regex when evaluating the version.
+     * Include all files matching the given regular expression when evaluating
+     * the version.
      *
-     * @param regex the regex
-     * @return the version evaluator
+     * @param regex the regular expression
+     * @return this evaluator for chaining
      */
     VersionEvaluator matchingRegex(String regex);
 
@@ -112,39 +123,42 @@ public interface VersionEvaluator {
      * Include all files matching the given Ant pattern when evaluating
      * the version.
      *
-     * @param pattern the pattern
-     * @return the version evaluator
+     * @param pattern the Ant pattern
+     * @return this evaluator for chaining
      */
     VersionEvaluator matchingAntPattern(String pattern);
 
     /**
-     * Include all files in the given sub directory when evaluating the version.
+     * Include all files under the given sub-directory when evaluating
+     * the version.
      *
-     * @param subDirectory the sub directory
-     * @return the version evaluator
+     * @param subDirectory the sub-directory, relative to the repository work
+     * tree or absolute
+     * @return this evaluator for chaining
      */
     VersionEvaluator subDirectory(Path subDirectory);
 
     /**
-     * Returns the list of "dirty" (uncommitted or untracked) files
-     * in the work tree that match the configured selection.
+     * Returns a stream of "dirty" (uncommitted or untracked) files
+     * in the work tree that match the configured file selection.
      *
-     * @return the list
+     * @return a stream of paths
      */
     Stream<Path> dirtyFiles();
 
     /**
-     * Returns the list of files in the work tree that have been modified
-     * since the last commit and match the configured selection.
+     * Returns a stream of files modified since the latest version tag
+     * that match the configured file selection.
      *
-     * @return the stream
+     * @return a stream of paths
      */
     Stream<Path> modifiedFiles();
 
     /**
-     * Returns the evaluated version.
+     * Evaluates and returns the version string for the current repository
+     * state.
      *
-     * @return the string
+     * @return the version string
      */
     String version();
 }

@@ -18,18 +18,23 @@
 
 package org.jdrupes.gitversioning.api;
 
+import java.util.ServiceLoader;
 import org.eclipse.jgit.lib.Repository;
 
 /**
- * Defines the SPI for version evaluator implementations.
+ * SPI for version evaluator implementations.
+ *
+ * <p>Implementations are discovered via the {@link ServiceLoader}
+ * mechanism. Register the provider in
+ * {@code META-INF/services/org.jdrupes.gitversioning.api.VersionEvaluatorProvider}.
  */
 public interface VersionEvaluatorProvider extends VersionEvaluator {
 
     /**
      * Sets the repository to use.
      *
-     * @param repository the repository
-     * @return the version evaluator provider
+     * @param repository the Git repository
+     * @return this provider for chaining
      */
     VersionEvaluatorProvider repository(Repository repository);
 

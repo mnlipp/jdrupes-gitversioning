@@ -17,6 +17,16 @@
  */
 
 /**
- * GitVersioning API
+ * Public API for Git-based version evaluation.
+ *
+ * <p>Use
+ * {@link VersionEvaluator#forRepository(org.eclipse.jgit.lib.Repository)}
+ * to obtain a version evaluator for a Git repository. Configure tag filtering
+ * via {@link TagFilter}, version generation via {@link TagProcessor}, and
+ * file selection via the {@code matching} and {@code subDirectory} methods on
+ * {@link VersionEvaluator}.
+ *
+ * <p>Implementations are loaded through {@link VersionEvaluatorProvider} using
+ * the {@link java.util.ServiceLoader} mechanism.
  */
 package org.jdrupes.gitversioning.api;

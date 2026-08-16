@@ -58,17 +58,21 @@ import org.jdrupes.gitversioning.api.TagProcessor;
 import org.jdrupes.gitversioning.api.VersionEvaluator;
 
 /**
- * A simple version evaluator provider. It looks up the tags in the
- * current branch, uses the tag filter to identify the version tags
- * and selects the latest one.
- * 
- * It then invokes the tag processor to produce a version string.
+ * Reference implementation of
+ * {@link org.jdrupes.gitversioning.api.VersionEvaluatorProvider}.
+ *
+ * <p>Finds the latest semantically versioned tag reachable from HEAD using the
+ * configured {@link TagFilter}, then delegates to the configured
+ * {@link TagProcessor} to produce the final version string.
+ *
+ * <p>Uses a {@link ConcurrentHashMap} to cache the set of
+ * commits reachable from HEAD, avoiding redundant graph walks.
  */
 @SuppressWarnings("PMD.CouplingBetweenObjects")
 public class VersionEvaluatorProvider
         implements org.jdrupes.gitversioning.api.VersionEvaluatorProvider {
 
-    /** The logger. */
+    /** Logger for this instance. */
     protected final Logger log = Logger.getLogger(getClass().getName());
     @SuppressWarnings("PMD.FieldNamingConventions")
     private static final Map<ObjectId, Set<ObjectId>> reachableByHead
@@ -79,7 +83,7 @@ public class VersionEvaluatorProvider
     private TagProcessor tagProcessor = new MavenStyleTagProcessor();
 
     /**
-     * Initializes a new version evaluator provider.
+     * Creates a new evaluator provider with default tag filter and processor.
      */
     public VersionEvaluatorProvider() {
         // Make javadoc happy.
