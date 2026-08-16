@@ -156,7 +156,7 @@ public class Root extends AbstractRootProject {
                 setupArtifactGeneration(project);
             } else {
                 project.generator(JavaCompiler::new).addSources(Path.of("test"),
-                    "**/*.java").options("--release", "25");
+                    "**/*.java").options("--release", "21");
                 project.generator(JavaResourceCollector::new).add(Path.of(
                     "test-resources"), "**/*");
                 project.dependency(Consume, new MvnRepoLookup()
