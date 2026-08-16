@@ -29,6 +29,8 @@ import org.jdrupes.builder.api.Project;
 import org.jdrupes.builder.api.ResourceType;
 import org.jdrupes.builder.api.RootProject;
 import org.jdrupes.builder.core.AbstractRootProject;
+import org.jdrupes.builder.core.VersionReporter;
+
 import static org.jdrupes.builder.api.CoreProperties.*;
 import org.jdrupes.builder.eclipse.EclipseConfiguration;
 import org.jdrupes.builder.eclipse.EclipseConfigurator;
@@ -129,6 +131,7 @@ public class Root extends AbstractRootProject {
         try {
             if (project instanceof RootProject) {
                 project.set(GitApi, Git.open(project.directory().toFile()));
+                return;
             }
         } catch (IOException e) {
             throw new BuildException().cause(e);
@@ -139,6 +142,7 @@ public class Root extends AbstractRootProject {
             .subDirectory(project.directory())
             .tagFilter(new DefaultTagFilter().prepend(project.name() + "-"));
         project.set(Version, evaluator.version());
+        project.generator(VersionReporter::new);
     }
 
     private static void setupCommonGenerators(Project project) {
