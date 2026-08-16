@@ -23,7 +23,6 @@ import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
 import java.util.stream.Stream;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -96,9 +95,7 @@ public interface VersionEvaluator {
     /**
      * Include all files matching the given glob when evaluating the version.
      *
-     * @return the version evaluator
-     *
-     * @param glob the glob
+     * @param glob the glob expression
      * @return the version evaluator
      */
     VersionEvaluator matchingGlob(String glob);
@@ -133,7 +130,6 @@ public interface VersionEvaluator {
      * in the work tree that match the configured selection.
      *
      * @return the list
-     * @throws GitAPIException the git API exception
      */
     Stream<Path> dirtyFiles();
 

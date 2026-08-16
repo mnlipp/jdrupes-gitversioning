@@ -31,6 +31,8 @@ public class GlobMatcher implements IncludeMatcher {
 
     /**
      * Initializes a new glob matcher.
+     *
+     * @param pattern the pattern
      */
     public GlobMatcher(String pattern) {
         matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
