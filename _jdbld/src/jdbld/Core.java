@@ -19,6 +19,8 @@
 package jdbld;
 
 import static org.jdrupes.builder.api.Intent.*;
+
+import org.jdrupes.builder.api.MergedTestProject;
 import org.jdrupes.builder.core.AbstractProject;
 import org.jdrupes.builder.java.JavaProject;
 import org.jdrupes.builder.mvnrepo.MvnRepoLookup;
@@ -29,7 +31,15 @@ public class Core extends AbstractProject implements JavaProject {
         super(name("core"));
         dependency(Expose, project(Api.class));
         dependency(Reveal, new MvnRepoLookup()
-            .resolve("com.vdurmont:semver4j:3.1.0"));
+            .resolve("com.vdurmont:semver4j:3.1.0",
+                "io.github.azagniotov:ant-style-path-matcher:1.0.0"));
     }
 
+    public static class CoreTest extends AbstractProject
+            implements JavaProject, MergedTestProject {
+        public CoreTest() {
+            super(parent(Core.class));
+            dependency(Consume, project(Core.class));
+        }
+    }
 }

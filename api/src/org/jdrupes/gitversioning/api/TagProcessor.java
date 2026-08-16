@@ -19,10 +19,7 @@
 package org.jdrupes.gitversioning.api;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
  * A [TagProcessor] generates a version based on information retrieved from
@@ -34,20 +31,14 @@ public interface TagProcessor {
     /**
      * Generate the version.
      *
-     * @param repository the git repository
-     * @param subDir the sub directory of the repository where the code
-     * is located that is relevant for versioning. May be null if the
-     * whole repository is relevant.
-     * @param commit the latest commit with a version tag (see [TagFilter]).
-     * May be null if no such commit exists.
-     * @param tagName the tag name the tag's name. May be null if no such
-     * tag exists.
+     * @param evaluator the version evaluator
+     * @param tagName the tag's name. May be null if no such tag exists.
      * @param version the version part of the tag. Defaults to "0.0.0" if
      * no tag was found.
      * @return the version
      * @throws IOException is handled by the invoker as a convenience
-     * @throws GitAPIException is handled by the onvoker as a convenience
+     * @throws GitAPIException is handled by the invoker as a convenience
      */
-    String version(Repository repository, Path subDir, RevCommit commit,
+    String version(VersionEvaluator evaluator,
             String tagName, String version) throws IOException, GitAPIException;
 }

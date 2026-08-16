@@ -5,6 +5,7 @@
 - **No Maven/Gradle.** This project uses [JDrupes Builder](https://github.com/mnlipp/jdrupes-builder), invoked via `./jdbld`.
 - All build commands run from the repo root:
   - `./jdbld build` — compile both modules, produce JARs in `api/build/libs/` and `core/build/libs/`
+  - `./jdbld test` — run unit tests
   - `./jdbld javadoc` — generate Javadoc (output in `core/build/doc/`)
   - `./jdbld deploy` — deploy artifacts to the Codeberg Maven registry
 - The builder requires Java 25. The `javaHome` in `.jdbld.properties` may need updating on a new machine. Alternatively set `JAVA_HOME` before invoking `./jdbld`.
@@ -39,7 +40,9 @@ These are primarily Eclipse IDE integrations; no standalone CLI equivalent exist
 
 ## Formatting
 
-Per `.editorconfig`: 4-space indent for Java, UTF-8, final newline, trimmed trailing whitespace.
+- Per `.editorconfig`: 4-space indent for Java, UTF-8, final newline, trimmed trailing whitespace.
+- **Line length:** max 80 (configured in Eclipse; checkstyle.xml is more
+  permissive because sometimes lines cannot be split)
 
 ## Generated / Ignored Artifacts
 

@@ -21,25 +21,38 @@ package org.jdrupes.gitversioning.core;
 import com.vdurmont.semver4j.Semver;
 import com.vdurmont.semver4j.SemverException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators.AbstractSpliterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.jdrupes.gitversioning.api.TagFilter;
 import org.jdrupes.gitversioning.api.TagProcessor;
 import org.jdrupes.gitversioning.api.VersionEvaluator;
@@ -51,6 +64,7 @@ import org.jdrupes.gitversioning.api.VersionEvaluator;
  * 
  * It then invokes the tag processor to produce a version string.
  */
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class VersionEvaluatorProvider
         implements org.jdrupes.gitversioning.api.VersionEvaluatorProvider {
 
@@ -60,7 +74,7 @@ public class VersionEvaluatorProvider
     private static final Map<ObjectId, Set<ObjectId>> reachableByHead
         = new ConcurrentHashMap<>();
     private Repository repository;
-    private Path directory;
+    private final List<IncludeMatcher> matchers = new ArrayList<>();
     private TagFilter tagFilter = new DefaultTagFilter();
     private TagProcessor tagProcessor = new MavenStyleTagProcessor();
 
@@ -73,14 +87,52 @@ public class VersionEvaluatorProvider
 
     @Override
     public VersionEvaluatorProvider repository(Repository repository) {
-        this.repository = repository;
+        this.repository = Objects.requireNonNull(repository);
+        return this;
+    }
+
+    @Override
+    public Repository repository() {
+        return repository;
+    }
+
+    @Override
+    public VersionEvaluator tagFilter(TagFilter tagFilter) {
+        this.tagFilter = tagFilter;
+        return this;
+    }
+
+    @Override
+    public VersionEvaluator tagProcessor(TagProcessor tagProcessor) {
+        this.tagProcessor = tagProcessor;
+        return this;
+    }
+
+    @Override
+    public VersionEvaluator matchingGlob(String glob) {
+        matchers.add(new GlobMatcher(glob));
+        return this;
+    }
+
+    @Override
+    public VersionEvaluator matchingRegex(String regex) {
+        matchers.add(new RegexMatcher(regex));
+        return this;
+    }
+
+    @Override
+    public VersionEvaluator matchingAntPattern(String pattern) {
+        matchers.add(new AntPatternMatcher(pattern));
         return this;
     }
 
     @Override
     public VersionEvaluator subDirectory(Path subDirectory) {
-        directory = relativizeDirectory(repository, subDirectory);
-        return this;
+        var subDir = relativizeDirectory(repository, subDirectory).toString();
+        if (!subDir.endsWith("/")) {
+            subDir = subDir + "/";
+        }
+        return matchingAntPattern(subDir + "**");
     }
 
     /**
@@ -104,24 +156,140 @@ public class VersionEvaluatorProvider
         return repository.getWorkTree().toPath().relativize(subDirectory);
     }
 
-    @Override
-    public VersionEvaluator tagFilter(TagFilter tagFilter) {
-        this.tagFilter = tagFilter;
-        return this;
+    private boolean matches(Path path) {
+        return matchers.stream().filter(m -> m.matches(path)).findAny()
+            .isPresent();
     }
 
     @Override
-    public VersionEvaluator tagProcessor(TagProcessor tagProcessor) {
-        this.tagProcessor = tagProcessor;
-        return this;
+    public Stream<Path> dirtyFiles() {
+        try (Git git = Git.wrap(repository)) {
+            Status status = git.status().call();
+
+            // Uncommitted combines added, changed, removed, missing,
+            // modified and conflicting
+            return Stream.concat(status.getUncommittedChanges().stream(),
+                status.getUntracked().stream()).map(Path::of)
+                .filter(this::matches);
+        } catch (GitAPIException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Override
+    public Stream<Path> modifiedFiles() {
+        try {
+            var latest = getLatestVersionTagged();
+            return modifiedFiles(latest.commit());
+        } catch (IOException | GitAPIException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @SuppressWarnings({ "PMD.AvoidCatchingGenericException",
+        "PMD.CognitiveComplexity", "PMD.NcssCount" })
+    private Stream<Path> modifiedFiles(RevCommit taggedCommit)
+            throws IOException, GitAPIException {
+
+        var headId = repository.resolve("HEAD");
+
+        if (headId == null || taggedCommit.getId().equals(headId)) {
+            return Stream.empty();
+        }
+
+        @SuppressWarnings("PMD.CloseResource")
+        var revWalk = new RevWalk(repository);
+        @SuppressWarnings("PMD.CloseResource")
+        var git = new Git(repository);
+        @SuppressWarnings("PMD.CloseResource")
+        var reader = repository.newObjectReader();
+        try {
+            revWalk.markStart(revWalk.parseCommit(headId));
+            var commits = revWalk.iterator();
+            var taggedId = taggedCommit.getId();
+            var spliterator = new AbstractSpliterator<Path>(
+                Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL) {
+                private Iterator<DiffEntry> diffs = Collections.emptyIterator();
+                private boolean finished;
+
+                @Override
+                public boolean tryAdvance(Consumer<? super Path> action) {
+                    while (!finished) {
+                        // Lazily consume the current commit's diffs.
+                        while (diffs.hasNext()) {
+                            var diff = diffs.next();
+                            var newPath = Path.of(diff.getNewPath());
+                            if (matches(newPath)) {
+                                action.accept(newPath);
+                                return true;
+                            }
+                            var oldPath = Path.of(diff.getOldPath());
+                            if (matches(oldPath)) {
+                                action.accept(oldPath);
+                                return true;
+                            }
+                        }
+
+                        // Lazily advance to the next commit.
+                        if (!commits.hasNext()) {
+                            finished = true;
+                            return false;
+                        }
+                        var commit = commits.next();
+                        if (commit.getId().equals(taggedId)) {
+                            finished = true;
+                            return false;
+                        }
+
+                        // Next commit, new diffs
+                        diffs = nextDiffs(git, reader, commit);
+                    }
+                    return false;
+                }
+
+                private Iterator<DiffEntry> nextDiffs(Git git,
+                        ObjectReader reader,
+                        RevCommit commit) {
+                    try {
+                        var oldTreeParser = new CanonicalTreeParser();
+                        oldTreeParser.reset(reader,
+                            commit.getParent(0).getTree().getId());
+                        var newTreeParser = new CanonicalTreeParser();
+                        newTreeParser.reset(reader,
+                            commit.getTree().getId());
+                        return git.diff().setNewTree(newTreeParser)
+                            .setOldTree(oldTreeParser).call().iterator();
+                    } catch (GitAPIException e) {
+                        throw new UncheckedIOException(new IOException(
+                            "Unable to calculate Git diff", e));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(
+                            "Unable to calculate Git diff", e);
+                    }
+                }
+            };
+
+            return StreamSupport.stream(spliterator, false)
+                .onClose(() -> {
+                    reader.close();
+                    git.close();
+                    revWalk.close();
+                });
+
+        } catch (RuntimeException | Error e) {
+            reader.close();
+            git.close();
+            revWalk.close();
+            throw e;
+        }
     }
 
     @Override
     public String version() {
         try {
             var latest = getLatestVersionTagged();
-            return tagProcessor.version(repository, directory,
-                latest.commit(), latest.tag(), latest.version().toString());
+            return tagProcessor.version(this, latest.tag(),
+                latest.version().toString());
         } catch (IOException | GitAPIException e) {
             throw new IllegalStateException(e);
         }

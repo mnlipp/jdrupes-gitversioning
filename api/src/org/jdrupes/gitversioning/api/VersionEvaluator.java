@@ -19,18 +19,20 @@
 package org.jdrupes.gitversioning.api;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.ServiceLoader.Provider;
 import java.util.stream.Stream;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 
 /**
  * Defines a configurable version evaluator.
+ * 
+ * By default, all files in the work tree are included when evaluating
+ * the version. This can be changed using the "{@code matching}..." methods
+ * (and {@link #subDirectory(Path)}). The file selection by these methods
+ * is accumulative, i.e. is a logical OR of the matching rules.
  */
 public interface VersionEvaluator {
 
@@ -69,38 +71,11 @@ public interface VersionEvaluator {
     }
 
     /**
-     * Searches the sub directory for changes (any of combines added,
-     * changed, removed, missing, modified, conflicting or untracked). 
+     * Returns the evalutor's repository.
      *
-     * @param repository the repository
-     * @param subDir the sub dir
-     * @return true, if is dirty
-     * @throws GitAPIException the git API exception
+     * @return the repository
      */
-    static List<Path> dirtyFiles(Repository repository, Path subDir)
-            throws GitAPIException {
-        try (Git git = Git.wrap(repository)) {
-            Status status = git.status().call();
-            var useAll = subDir == null || Path.of("").equals(subDir);
-
-            // Uncommitted combines added, changed, removed, missing,
-            // modified and conflicting
-            return Stream.concat(status.getUncommittedChanges().stream(),
-                status.getUntracked().stream()).map(Path::of)
-                .filter(path -> useAll || path.startsWith(subDir))
-                .toList();
-        }
-    }
-
-    /**
-     * Sets the sub directory of the work tree that is relevant for
-     * evaluating the version. Usually, only files in this directory are
-     * checked for changes, resulting in a "dirty" in the version.
-     *
-     * @param subDirectory the sub directory
-     * @return the version evaluator
-     */
-    VersionEvaluator subDirectory(Path subDirectory);
+    Repository repository();
 
     /**
      * Sets the tag filter to use.
@@ -117,6 +92,58 @@ public interface VersionEvaluator {
      * @return the version evaluator
      */
     VersionEvaluator tagProcessor(TagProcessor tagProcessor);
+
+    /**
+     * Include all files matching the given glob when evaluating the version.
+     *
+     * @return the version evaluator
+     *
+     * @param glob the glob
+     * @return the version evaluator
+     */
+    VersionEvaluator matchingGlob(String glob);
+
+    /**
+     * Include all files matching the given regex when evaluating the version.
+     *
+     * @param regex the regex
+     * @return the version evaluator
+     */
+    VersionEvaluator matchingRegex(String regex);
+
+    /**
+     * Include all files matching the given Ant pattern when evaluating
+     * the version.
+     *
+     * @param pattern the pattern
+     * @return the version evaluator
+     */
+    VersionEvaluator matchingAntPattern(String pattern);
+
+    /**
+     * Include all files in the given sub directory when evaluating the version.
+     *
+     * @param subDirectory the sub directory
+     * @return the version evaluator
+     */
+    VersionEvaluator subDirectory(Path subDirectory);
+
+    /**
+     * Returns the list of "dirty" (uncommitted or untracked) files
+     * in the work tree that match the configured selection.
+     *
+     * @return the list
+     * @throws GitAPIException the git API exception
+     */
+    Stream<Path> dirtyFiles();
+
+    /**
+     * Returns the list of files in the work tree that have been modified
+     * since the last commit and match the configured selection.
+     *
+     * @return the stream
+     */
+    Stream<Path> modifiedFiles();
 
     /**
      * Returns the evaluated version.

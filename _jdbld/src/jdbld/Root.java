@@ -21,7 +21,10 @@ package jdbld;
 import static jdbld.ExtProps.GitApi;
 import static org.jdrupes.builder.api.Intent.*;
 import static org.jdrupes.builder.api.ResourceType.ProjectVersionType;
+import static org.jdrupes.builder.api.ResourceType.TestResultType;
+
 import org.jdrupes.builder.api.BuildException;
+import org.jdrupes.builder.api.MergedTestProject;
 import org.jdrupes.builder.api.Project;
 import org.jdrupes.builder.api.ResourceType;
 import org.jdrupes.builder.api.RootProject;
@@ -60,6 +63,7 @@ import org.jdrupes.builder.java.JavaProject;
 import org.jdrupes.builder.java.JavaResourceCollector;
 import org.jdrupes.builder.java.Javadoc;
 import org.jdrupes.builder.java.LibraryBuilder;
+import org.jdrupes.builder.junit.JUnitTestRunner;
 
 public class Root extends AbstractRootProject {
 
@@ -112,6 +116,8 @@ public class Root extends AbstractRootProject {
             .resources(of(ProjectVersionType).using(Supply));
         commandAlias("build").projects("**")
             .resources(of(LibraryJarFileType).using(Supply));
+        commandAlias("test").description("Run all tests").projects("**")
+            .resources(of(TestResultType).using(Supply));
         commandAlias("javadoc").resources(of(JavadocDirectoryType));
         commandAlias("eclipse").resources(of(
             new ResourceType<EclipseConfiguration>() {}));
@@ -137,84 +143,105 @@ public class Root extends AbstractRootProject {
 
     private static void setupCommonGenerators(Project project) {
         if (project instanceof JavaProject) {
-            project.generator(JavaCompiler::new)
-                .addSources(Path.of("src"), "**/*.java")
-                .options("--release", "21");
-            project.generator(JavaResourceCollector::new)
-                .add(Path.of("resources"), "**/*");
-
-            // Provide POM
-            project.dependency(Supply, PomFileGenerator::new)
-                .adaptPom(model -> {
-                    model.setDescription("See URL.");
-                    model.setUrl("https://jdrupes.org/");
-                    var scm = new Scm();
-                    scm.setUrl(
-                        "https://github.com/jdrupes/jdrupes-gitversioning");
-                    scm.setConnection(
-                        "scm:git://github.com/jdrupes/jdrupes-gitversioning.git");
-                    scm.setDeveloperConnection(
-                        "scm:git://github.com/jdrupes/jdrupes-gitversioning.git");
-                    model.setScm(scm);
-                    var license = new License();
-                    license.setName("AGPL 3.0");
-                    license.setUrl(
-                        "https://www.gnu.org/licenses/agpl-3.0.en.html");
-                    license.setDistribution("repo");
-                    model.setLicenses(List.of(license));
-                    var developer = new Developer();
-                    developer.setId("mnlipp");
-                    developer.setName("Michael N. Lipp");
-                    model.setDevelopers(List.of(developer));
-                });
-
-            // Provide library jar
-            project.dependency(Supply, new LibraryBuilder(project)
-                .addFrom(project.providers().select(Supply))
-                .addEntries(project.resources(
-                    project.of(PomFileType).using(Supply))
-                    .map(pomFile -> Map.entry(Path.of("META-INF/maven")
-                        .resolve((String) project.get(GroupId))
-                        .resolve(project.name())
-                        .resolve("pom.xml"), pomFile))));
-
-            // Supply sources jar
-            project.generator(SourcesJarBuilder::new).addTrees(
-                project.resources(project.of(
-                    JavaSourceTreeType).using(Supply, Expose)));
-
-            // Supply javadoc
-            project.generator(Javadoc::new)
-                .options("-overview", project.rootProject().directory()
-                    .resolve("overview.html").toString())
-                .options("--add-stylesheet", project.rootProject().directory()
-                    .resolve("misc/javadoc-overwrites.css").toString())
-                .options("--add-script", project.rootProject().directory()
-                    .resolve("misc/highlight.min.js").toString())
-                .options("--add-script", project.rootProject().directory()
-                    .resolve("misc/highlight-all.js").toString())
-                .options("--add-stylesheet", project.rootProject().directory()
-                    .resolve("misc/highlight-default.css").toString())
-                .options("-bottom", project.rootProject().readString(
-                    Path.of("misc/javadoc.bottom.txt")))
-                .options("--allow-script-in-comments")
-                .options("-linksource")
-                .options("-link",
-                    "https://docs.oracle.com/en/java/javase/21/docs/api/")
-                .options("-quiet");
-
-            // Supply javadoc jar
-            project.generator(JavadocJarBuilder::new);
-
-            // Publish (deploy). Credentials and signing information is
-            // obtained through properties and/or settings.xml.
-            project.generator(MvnPublisher::new).destinations(
-                new MvnDeployDestination(MvnVersionType.SNAPSHOT,
-                    MvnVersionType.RELEASE).repositoryUri(
-                        URI.create(
-                            "https://codeberg.org/api/packages/JDrupes/maven"))
-                        .id("codeberg"));
+            if (!(project instanceof MergedTestProject)) {
+                project.generator(JavaCompiler::new)
+                    .addSources(Path.of("src"), "**/*.java")
+                    .options("--release", "21");
+                project.generator(JavaResourceCollector::new)
+                    .add(Path.of("resources"), "**/*");
+                setupArtifactGeneration(project);
+            } else {
+                project.generator(JavaCompiler::new).addSources(Path.of("test"),
+                    "**/*.java").options("--release", "25");
+                project.generator(JavaResourceCollector::new).add(Path.of(
+                    "test-resources"), "**/*");
+                project.dependency(Consume, new MvnRepoLookup()
+                    .resolve("junit:junit:4.13.2")
+                    .bom("org.junit:junit-bom:5.14.2")
+                    .resolve("org.junit.jupiter:junit-jupiter-api")
+                    .resolve("org.junit.jupiter:junit-jupiter-params")
+                    .resolve("org.junit.jupiter:junit-jupiter-engine",
+                        "org.junit.vintage:junit-vintage-engine",
+                        "net.jodah:concurrentunit:0.4.2"));
+                project.dependency(Supply, JUnitTestRunner::new);
+            }
         }
+    }
+
+    private static void setupArtifactGeneration(Project project) {
+        // Provide POM
+        project.dependency(Supply, PomFileGenerator::new)
+            .adaptPom(model -> {
+                model.setDescription("See URL.");
+                model.setUrl("https://jdrupes.org/");
+                var scm = new Scm();
+                scm.setUrl(
+                    "https://github.com/jdrupes/jdrupes-gitversioning");
+                scm.setConnection(
+                    "scm:git://github.com/jdrupes/jdrupes-gitversioning.git");
+                scm.setDeveloperConnection(
+                    "scm:git://github.com/jdrupes/jdrupes-gitversioning.git");
+                model.setScm(scm);
+                var license = new License();
+                license.setName("AGPL 3.0");
+                license.setUrl(
+                    "https://www.gnu.org/licenses/agpl-3.0.en.html");
+                license.setDistribution("repo");
+                model.setLicenses(List.of(license));
+                var developer = new Developer();
+                developer.setId("mnlipp");
+                developer.setName("Michael N. Lipp");
+                model.setDevelopers(List.of(developer));
+            });
+
+        // Provide library jar
+        project.dependency(Supply, new LibraryBuilder(project)
+            .addFrom(project.providers().select(Supply))
+            .addEntries(project.resources(
+                project.of(PomFileType).using(Supply))
+                .map(pomFile -> Map.entry(Path.of("META-INF/maven")
+                    .resolve((String) project.get(GroupId))
+                    .resolve(project.name())
+                    .resolve("pom.xml"), pomFile))));
+
+        // Supply sources jar
+        project.generator(SourcesJarBuilder::new).addTrees(
+            project.resources(project.of(
+                JavaSourceTreeType).using(Supply, Expose)));
+
+        // Supply javadoc
+        project.generator(Javadoc::new)
+            .options("-overview", project.rootProject().directory()
+                .resolve("overview.html").toString())
+            .options("--add-stylesheet",
+                project.rootProject().directory()
+                    .resolve("misc/javadoc-overwrites.css").toString())
+            .options("--add-script", project.rootProject().directory()
+                .resolve("misc/highlight.min.js").toString())
+            .options("--add-script", project.rootProject().directory()
+                .resolve("misc/highlight-all.js").toString())
+            .options("--add-stylesheet",
+                project.rootProject().directory()
+                    .resolve("misc/highlight-default.css").toString())
+            .options("-bottom", project.rootProject().readString(
+                Path.of("misc/javadoc.bottom.txt")))
+            .options("--allow-script-in-comments")
+            .options("-linksource")
+            .options("-link",
+                "https://docs.oracle.com/en/java/javase/21/docs/api/")
+            .options("-quiet");
+
+        // Supply javadoc jar
+        project.generator(JavadocJarBuilder::new);
+
+        // Publish (deploy). Credentials and signing information is
+        // obtained through properties and/or settings.xml.
+        project.generator(MvnPublisher::new).destinations(
+            new MvnDeployDestination(MvnVersionType.SNAPSHOT,
+                MvnVersionType.RELEASE).repositoryUri(
+                    URI.create(
+                        "https://codeberg.org/api/packages/JDrupes/maven"))
+                    .id("codeberg"));
     }
 
     private static void setupEclipseConfigurator(Project project) {

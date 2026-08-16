@@ -1,6 +1,6 @@
 /*
  * JDrupes GitVersioning
- * Copyright (C) 2025 Michael N. Lipp
+ * Copyright (C) 2025, 2026 Michael N. Lipp
  * 
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,18 +20,11 @@ package org.jdrupes.gitversioning.core;
 
 import com.vdurmont.semver4j.Semver;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.jdrupes.gitversioning.api.VersionEvaluator;
 
 /**
@@ -93,18 +86,13 @@ public class MavenStyleTagProcessor extends TagProcessorBase {
     }
 
     @Override
-    public String version(Repository repository, Path subDir, RevCommit commit,
-            String tagName, String version)
-            throws IOException, GitAPIException {
+    public String version(VersionEvaluator evaluator, String tagName,
+            String version) throws IOException, GitAPIException {
         if (version.endsWith("-SNAPSHOT")) {
             return version;
         }
-        if (subDir == null) {
-            subDir = Path.of("");
-        }
-        subDir = VersionEvaluatorProvider
-            .relativizeDirectory(repository, subDir);
-        if (commit != null && isVersionClean(repository, subDir, commit)) {
+        if (evaluator.dirtyFiles().findAny().isEmpty()
+            && evaluator.modifiedFiles().findAny().isEmpty()) {
             return version;
         }
 
@@ -112,7 +100,7 @@ public class MavenStyleTagProcessor extends TagProcessorBase {
         Semver semver
             = new Semver(version, Semver.SemverType.LOOSE).nextPatch();
         StringBuilder newVersion = new StringBuilder(semver.toString());
-        var branch = repository.getBranch();
+        var branch = evaluator.repository().getBranch();
         if (!ignoredBranches.stream().map(p -> p.matcher(branch).matches())
             .filter(b -> b).findAny().isPresent()) {
             newVersion.append('-')
@@ -121,58 +109,4 @@ public class MavenStyleTagProcessor extends TagProcessorBase {
         newVersion.append("-SNAPSHOT");
         return newVersion.toString();
     }
-
-    @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
-    private boolean isVersionClean(Repository repository, Path subDir,
-            RevCommit taggedCommit) throws IOException, GitAPIException {
-        // First, reject if there are any dirty files in the relevant directory.
-        if (!VersionEvaluator.dirtyFiles(repository, subDir).isEmpty()) {
-            return false;
-        }
-        // If the repository has no commits, it is trivially clean.
-        var headId = repository.resolve("HEAD");
-        if (headId == null) {
-            return true;
-        }
-        // If the tag points to HEAD, no new commits exist to check.
-        if (taggedCommit.getId().equals(headId)) {
-            return true;
-        }
-        // Determine the base path for filtering diffs. An empty path means
-        // all files are relevant.
-        var taggedId = taggedCommit.getId();
-        // Walk from HEAD back toward the tagged commit. For each commit,
-        // diff its tree against its parent to see what changed.
-        try (var revWalk = new RevWalk(repository);
-                var git = new Git(repository)) {
-            revWalk.markStart(revWalk.parseCommit(headId));
-            for (RevCommit c : revWalk) {
-                // Reached the tagged commit — all intervening commits are clean.
-                if (c.getId().equals(taggedId)) {
-                    break;
-                }
-                // Compare this commit's tree with its parent's tree.
-                var oldTreeParser = new CanonicalTreeParser();
-                oldTreeParser.reset(repository.newObjectReader(),
-                    c.getParent(0).getTree().getId());
-                var newTreeParser = new CanonicalTreeParser();
-                newTreeParser.reset(repository.newObjectReader(),
-                    c.getTree().getId());
-                var diffs = git.diff().setNewTree(newTreeParser)
-                    .setOldTree(oldTreeParser).call();
-                // If any diff entry touches the relevant directory, the
-                // version is no longer clean.
-                for (DiffEntry diff : diffs) {
-                    var newPath = Path.of(diff.getNewPath());
-                    var oldPath = Path.of(diff.getOldPath());
-                    if (subDir.equals(Path.of("")) || newPath.startsWith(subDir)
-                        || oldPath.startsWith(subDir)) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
-
 }
