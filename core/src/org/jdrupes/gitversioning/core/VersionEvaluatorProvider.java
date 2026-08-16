@@ -133,6 +133,9 @@ public class VersionEvaluatorProvider
     @Override
     public VersionEvaluator subDirectory(Path subDirectory) {
         var subDir = relativizeDirectory(repository, subDirectory).toString();
+        if (subDir.isEmpty()) {
+            return this;
+        }
         if (!subDir.endsWith("/")) {
             subDir = subDir + "/";
         }
@@ -161,8 +164,9 @@ public class VersionEvaluatorProvider
     }
 
     private boolean matches(Path path) {
-        return matchers.stream().filter(m -> m.matches(path)).findAny()
-            .isPresent();
+        return matchers.isEmpty()
+            || matchers.stream().filter(m -> m.matches(path)).findAny()
+                .isPresent();
     }
 
     @Override
