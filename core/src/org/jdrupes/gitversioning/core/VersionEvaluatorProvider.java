@@ -198,10 +198,9 @@ public class VersionEvaluatorProvider
         "PMD.CognitiveComplexity", "PMD.NcssCount" })
     private Stream<Path> modifiedFiles(RevCommit taggedCommit)
             throws IOException, GitAPIException {
-
         var headId = repository.resolve("HEAD");
-
-        if (headId == null || taggedCommit.getId().equals(headId)) {
+        if (headId == null || taggedCommit == null
+            || taggedCommit.getId().equals(headId)) {
             return Stream.empty();
         }
 
