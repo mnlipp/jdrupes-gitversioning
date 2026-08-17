@@ -658,6 +658,69 @@ class VersonEvaluatorProviderTests {
         assertEquals(Path.of("src", "test", "Test.java"), modified.get(0));
     }
 
+    // --- No filter tests (all files reported) ---
+
+    @Test
+    void dirtyFilesNoFilterReportsAll() throws Exception {
+        initRepo();
+
+        writeFile("src/Main.java", "class Main {}");
+        writeFile("src/Util.java", "class Util {}");
+        writeFile("docs/guide.md", "# Guide");
+        commitAll("initial");
+
+        writeFile("src/Main.java", "class Main { modified }");
+        writeFile("src/Util.java", "class Util { modified }");
+        writeFile("docs/guide.md", "# Guide modified");
+        git.add().addFilepattern(".").call();
+
+        var provider = new VersionEvaluatorProvider()
+            .repository(repository);
+
+        var dirty = provider.dirtyFiles().sorted().toList();
+        assertEquals(3, dirty.size());
+    }
+
+    @Test
+    void dirtyFilesNoFilterUntrackedAll() throws Exception {
+        initRepo();
+
+        writeFile("src/Main.java", "x");
+        commitAll("initial");
+
+        writeFile("src/NewFile.java", "new");
+        writeFile("docs/new.md", "new");
+        writeFile("config/app.yml", "new");
+
+        var provider = new VersionEvaluatorProvider()
+            .repository(repository);
+
+        var dirty = provider.dirtyFiles().sorted().toList();
+        assertEquals(3, dirty.size());
+    }
+
+    @Test
+    void modifiedFilesNoFilterReportsAll() throws Exception {
+        initRepo();
+
+        writeFile("src/Main.java", "v1");
+        writeFile("src/Util.java", "v1");
+        writeFile("docs/guide.md", "v1");
+        commitAll("v1");
+        tag("1.0.0");
+
+        writeFile("src/Main.java", "v2");
+        writeFile("src/Util.java", "v2");
+        writeFile("docs/guide.md", "v2");
+        commitAll("v2");
+
+        var provider = new VersionEvaluatorProvider()
+            .repository(repository);
+
+        var modified = provider.modifiedFiles().sorted().toList();
+        assertEquals(3, modified.size());
+    }
+
     // --- Builder pattern & edge cases ---
 
     @Test
